@@ -12,6 +12,7 @@ import pandas as pd
 
 load_dotenv()
 
+
 @dataclass
 class JiraTask:
     title: str
@@ -28,7 +29,7 @@ class WorkLogRecord:
     time_spent: timedelta
 
 
-def get_date():
+def get_date_str():
     if len(sys.argv) == 2:
         return sys.argv[1]
     else:
@@ -36,8 +37,8 @@ def get_date():
         month = ('0' + now.month.__str__())[-2:]
         return f'{now.year}-{month}-01'
 
-def read_jira_info(user) -> dict:
-    date = get_date()
+
+def read_jira_info(user: str, date: str) -> dict:
     url = os.environ['URL']
     params = {
         'jql': f'assignee in ({user}) and updated > {date} and project in (ME) and timespent > 0',
@@ -89,17 +90,19 @@ def group_work_logs_by_date(work_logs: List[WorkLogRecord]) -> Dict[date, List[W
     return result
 
 
-def filter_work_logs(work_logs: List[WorkLogRecord], username: str) -> List[WorkLogRecord]:
-    return list(filter(lambda l: l.author == username, work_logs))
+def filter_work_logs(work_logs: List[WorkLogRecord], username: str, date_started: datetime) -> List[WorkLogRecord]:
+    return list(filter(lambda l: l.author == username and l.time_started > date_started, work_logs))
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     user = os.environ['USER']
-    jira_info = read_jira_info(user)
+    date_start_str = get_date_str()
+    date_start = datetime.fromisoformat(date_start_str).astimezone(timezone(offset=timedelta(hours=8)))
+    jira_info = read_jira_info(user, date_start_str)
     (tasks, work_logs) = extract_tasks_and_work_logs(jira_info)
 
-    work_logs = filter_work_logs(work_logs, user)
+    work_logs = filter_work_logs(work_logs, user, date_start)
 
     grouped = group_work_logs_by_date(work_logs)
     df = pd.DataFrame(columns=['Результат', 'Задача', 'Дата', 'Время', 'Описание'])
